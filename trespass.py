@@ -24,7 +24,8 @@ parser.add_argument("--add", nargs='+', help="add an account, username and passw
 parser.add_argument("--remove", help="remove an account")
 parser.add_argument("--accounts", help="list all accounts",action="store_true")
 parser.add_argument("--showuser", help="show the username for an account")
-parser.add_argument("--showpass", nargs='+', help="show the password for a user/account")
+parser.add_argument("--showpass", help="show the password for a user")
+parser.add_argument("--debug", help="show debug info",action="store_true")
 
 #parser.add_argument("--portfolio", help="choose a portfolio")
 args = parser.parse_args()
@@ -32,11 +33,6 @@ args = parser.parse_args()
 if args.add:
 	if len(args.add)!=3:
 		print('account, username and password are required with --add')
-		sys.exit(1)
-
-if args.showpass:
-	if len(args.showpass)!=2:
-		print('account and username are required with --showpass')
 		sys.exit(1)
 
 if args.init:
@@ -74,6 +70,7 @@ else:
 	with open('acc.npy.gpg', 'rb') as input_file:
 		with open('acc.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
+
 acc=np.load('acc.npy').item()
 os.remove('acc.npy')
 
@@ -89,12 +86,12 @@ os.remove('user.npy')
 
 # function to add username and password for an account
 def inputtoacc(account, username, password):
-	acc.update({account:username})
+	accuser=(id(account, username))
+	acc.update({accuser:username})
 	np.save('acc.npy', acc)
 	with open('acc.npy', 'rb') as input_file:
 		with open('acc.npy.gpg', 'wb') as output_file:
 			c.encrypt([recipient], 0, input_file, output_file)	
-	accuser=((str(account)) + (str(username)))
 	print(accuser)
 	user.update({accuser:password})
 	np.save('user.npy', user)
@@ -104,25 +101,31 @@ def inputtoacc(account, username, password):
 	os.remove('acc.npy')
 	os.remove('user.npy')
 
+# function to create account:id
+def id(account, username):
+	a=0
+	for c in account+username:
+		a+=(ord(c))	
+	accuser=((account) + ":" + str(a))
+	return (accuser)
+
 # function to remove an account     
 def removeacc(account):
 	if account in acc:
-		accuser=((str(account)) + (acc[(account)]))
 		del acc[account]
 		np.save('acc.npy', acc)
 		with open('acc.npy', 'rb') as input_file:
 			with open('acc.npy.gpg', 'wb') as output_file:
-				c.encrypt([recipient], 0, input_file, output_file)		
-	else:
-		return
-	if accuser in user:
-		del user[accuser]
+				c.encrypt([recipient], 0, input_file, output_file)
+		os.remove('acc.npy')				
+
+	if account in user:
+		del user[account]
 		np.save('user.npy', user)
 		with open('user.npy', 'rb') as input_file:
 			with open('user.npy.gpg', 'wb') as output_file:
 				c.encrypt([recipient2], 0, input_file, output_file)
-	os.remove('acc.npy')
-	os.remove('user.npy')
+		os.remove('user.npy')
 	return
 
 # call inputtoacc if --add option on command line
@@ -155,14 +158,19 @@ if args.showuser:
 
 # call --showpass option on command line
 if args.showpass:
-	account=str(args.showpass[0])
-	username=str(args.showpass[1])
+	username=str(args.showpass)
 	if account in acc:
-		accuser=((str(account)) + (acc[(account)]))
-		print(user[accuser])
+		print(user[account])
+
+
+# call --dedug option on command line
+if args.debug:
+	print(recipient)
+	print(recipient2)
+	print(acc)
+	print(user)
 
 # polite exit if no acc in dictionary and --added not used
 if len(acc)==0:
 	print('Please input account with --add')
 	sys.exit(1)
-
