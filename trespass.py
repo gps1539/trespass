@@ -19,7 +19,7 @@ os.chdir(os.path.expanduser('.trespass'))
 
 # command line options and help
 parser = argparse.ArgumentParser()
-parser.add_argument("--init", nargs='+', help="initialize with gpg key")
+parser.add_argument("--init", nargs='+', help="initialize with two gpg keys")
 parser.add_argument("--add", nargs='+', help="add an account, username and password")
 parser.add_argument("--remove", help="remove an account")
 parser.add_argument("--accounts", help="list all accounts",action="store_true")
