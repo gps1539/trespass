@@ -23,4 +23,22 @@ optional arguments:
 
 To initialize 2 gpg keys need to be provided. They can be created via gpg2 --full-generate-key
 
+trespass --init key1 key2
+
+To add accounts
+trespass --add accountname username password
+
+To remove accounts
+trespass --remove 
+
+To show user for an account
+trespass.py --showuser accountname
+
+To show the password for the account/user
+trespass.py --showpass accountname username
+
+Files are written a .trespass/ directory in users home directory.
+
 The code is dependent on gpg2 and numpy and several python modules. It has been tested on Linux only.
+
+Expect bugs so don't use as your only password keeper.
