@@ -7,6 +7,7 @@ import gpgme
 import io
 import numpy as np
 import argparse
+import pyperclip
 
 # initialize gpg
 c = gpgme.Context()
@@ -25,6 +26,7 @@ parser.add_argument("--remove", help="remove an account")
 parser.add_argument("--accounts", help="list all accounts",action="store_true")
 parser.add_argument("--showuser", help="show the username for an account")
 parser.add_argument("--showpass", help="show the password for a user")
+parser.add_argument("--hidepass", help="put password in paste buffer")
 parser.add_argument("--debug", help="show debug info",action="store_true")
 
 #parser.add_argument("--portfolio", help="choose a portfolio")
@@ -143,7 +145,7 @@ if args.remove:
 
 # if --accounts option on command line      
 if args.accounts:
-	for key in acc.keys():
+	for key in sorted(acc.keys()):
 		print(key)
 	sys.exit(1)
 
@@ -162,6 +164,12 @@ if args.showpass:
 	if account in acc:
 		print(user[account])
 
+# call --hidepass option on command line
+if args.hidepass:
+	username=str(args.hidepass)
+	if account in acc:
+		pyperclip.copy(user[account])
+#		print(user[account])
 
 # call --dedug option on command line
 if args.debug:
