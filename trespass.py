@@ -27,9 +27,10 @@ parser.add_argument("--accounts", help="list all accounts",action="store_true")
 parser.add_argument("--showuser", help="show the username for an account")
 parser.add_argument("--showpass", help="show the password for a user")
 parser.add_argument("--hidepass", help="put password in paste buffer")
+parser.add_argument("--load", help="load acc & user files from ~.trepass/",action="store_true")
+parser.add_argument("--export",  help="export unencrypted acc and user npy files",action="store_true" )
 parser.add_argument("--debug", help="show debug info",action="store_true")
 
-#parser.add_argument("--portfolio", help="choose a portfolio")
 args = parser.parse_args()
 
 if args.add:
@@ -53,28 +54,47 @@ if args.init:
 	print(key2[1])
 	sys.exit(1)
 
+# check if gpg keys exist
 if os.path.exists('key1.npy')==False:
-	print('Please initialize with --init <gpg-key>')
+	print('Please initialize with --init <gpg-key UUID>')
 else:
 	keys1 = np.load('key1.npy').item()
 	recipient= c.get_key(str(keys1[1]))
 
 if os.path.exists('key2.npy')==False:
-	print('Please initialize with --init <gpg-key>')
+	print('Please initialize with --init <gpg-key UUID>')
 else:
 	keys2 = np.load('key2.npy').item()
 	recipient2= c.get_key(str(keys2[1]))
+
+# call --load option on command line
+if args.load:
+	if os.path.exists('acc.npy')==False:
+		print("Please copy acc.npy to .trespass in your home directory")
+		sys.exit(1)
+	else:
+		with open('acc.npy', 'rb') as input_file:
+			with open('acc.npy.gpg', 'wb') as output_file:
+				c.encrypt([recipient], 0, input_file, output_file)
+# maybe remove npy file here
+	if os.path.exists('user.npy')==False:
+		print("Please copy user.npy to .trespass in your home directory")
+		sys.exit(1)
+	else:
+		with open('user.npy', 'rb') as input_file:
+			with open('user.npy.gpg', 'wb') as output_file:
+				c.encrypt([recipient2], 0, input_file, output_file)
 
 if os.path.exists('acc.npy.gpg')==False:
 	acc={}
 	np.save('acc.npy', acc)
 else:
+# can this part be optimized, can acc=decrypted gpg?
 	with open('acc.npy.gpg', 'rb') as input_file:
 		with open('acc.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-
-acc=np.load('acc.npy').item()
-os.remove('acc.npy')
+	acc=np.load('acc.npy').item()
+	os.remove('acc.npy')
 
 if os.path.exists('user.npy.gpg')==False:
 	user={}
@@ -83,8 +103,8 @@ else:
 	with open('user.npy.gpg', 'rb') as input_file:
 		with open('user.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-user=np.load('user.npy').item()
-os.remove('user.npy')
+	user=np.load('user.npy').item()
+	os.remove('user.npy')
 
 # function to add username and password for an account
 def inputtoacc(account, username, password):
@@ -130,14 +150,14 @@ def removeacc(account):
 		os.remove('user.npy')
 	return
 
-# call inputtoacc if --add option on command line
+# if --add option on command line
 if args.add:
 	account=str(args.add[0])
 	username=str(args.add[1])
 	password=str(args.add[2])
 	inputtoacc(account,username,password)
 
-# call removeacc if --delete option on command line      
+# if --delete option on command line      
 if args.remove:
 	account=str(args.remove)
 	removeacc(account)
@@ -158,27 +178,33 @@ if args.showuser:
 		print('Error no account "' + (account) + '"')	
 		sys.exit(1)
 
-# call --showpass option on command line
+# if --showpass option on command line
 if args.showpass:
 	username=str(args.showpass)
 	if account in acc:
 		print(user[account])
 
-# call --hidepass option on command line
+# if --hidepass option on command line
 if args.hidepass:
 	username=str(args.hidepass)
 	if account in acc:
 		pyperclip.copy(user[account])
-#		print(user[account])
 
-# call --dedug option on command line
+# if --export option on command line
+if args.export:
+	with open('acc.npy.gpg', 'rb') as input_file:
+		with open('acc.npy', 'wb') as output_file:
+			c.decrypt(input_file, output_file)
+	acc=np.load('acc.npy').item()
+	with open('user.npy.gpg', 'rb') as input_file:
+		with open('user.npy', 'wb') as output_file:
+			c.decrypt(input_file, output_file)
+	acc=np.load('user.npy').item()
+	print('exported')
+
+# if --dedug option on command line
 if args.debug:
 	print(recipient)
 	print(recipient2)
 	print(acc)
 	print(user)
-
-# polite exit if no acc in dictionary and --added not used
-if len(acc)==0:
-	print('Please input account with --add')
-	sys.exit(1)
