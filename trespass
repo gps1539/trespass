@@ -33,6 +33,9 @@ parser.add_argument("--debug", help="show debug info",action="store_true")
 
 args = parser.parse_args()
 
+if (len(sys.argv)) < 2:
+	parser.print_usage()
+
 if args.add:
 	if len(args.add)!=3:
 		print('account, username and password are required with --add')
@@ -76,7 +79,6 @@ if args.load:
 		with open('acc.npy', 'rb') as input_file:
 			with open('acc.npy.gpg', 'wb') as output_file:
 				c.encrypt([recipient], 0, input_file, output_file)
-# maybe remove npy file here
 	if os.path.exists('user.npy')==False:
 		print("Please copy user.npy to .trespass in your home directory")
 		sys.exit(1)
@@ -89,13 +91,11 @@ if os.path.exists('acc.npy.gpg')==False:
 	acc={}
 	np.save('acc.npy', acc)
 else:
-# can this part be optimized, can acc=decrypted gpg?
 	with open('acc.npy.gpg', 'rb') as input_file:
 		with open('acc.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
 	acc=np.load('acc.npy').item()
 	os.remove('acc.npy')
-
 if os.path.exists('user.npy.gpg')==False:
 	user={}
 	np.save('user.npy', acc)
@@ -140,7 +140,6 @@ def removeacc(account):
 			with open('acc.npy.gpg', 'wb') as output_file:
 				c.encrypt([recipient], 0, input_file, output_file)
 		os.remove('acc.npy')				
-
 	if account in user:
 		del user[account]
 		np.save('user.npy', user)
