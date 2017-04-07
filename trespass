@@ -8,6 +8,8 @@ import io
 import numpy as np
 import argparse
 import pyperclip
+import string
+from random import *
 
 # initialize gpg
 c = gpgme.Context()
@@ -20,16 +22,17 @@ os.chdir(os.path.expanduser('.trespass'))
 
 # command line options and help
 parser = argparse.ArgumentParser()
-parser.add_argument("--init", nargs='+', help="initialize with two gpg keys")
-parser.add_argument("--add", nargs='+', help="add an account, username and password")
-parser.add_argument("--remove", help="remove an account")
 parser.add_argument("--accounts", help="list all accounts",action="store_true")
-parser.add_argument("--showuser", help="show the username for an account")
-parser.add_argument("--showpass", help="show the password for a user")
-parser.add_argument("--hidepass", help="put password in paste buffer")
-parser.add_argument("--load", help="load acc & user files from ~.trepass/",action="store_true")
-parser.add_argument("--export",  help="export unencrypted acc and user npy files",action="store_true" )
+parser.add_argument("--add", nargs='+', help="add an account, username and password")
+parser.add_argument("--add_random", nargs='+', help="add an account username with random password")
 parser.add_argument("--debug", help="show debug info",action="store_true")
+parser.add_argument("--export",  help="export unencrypted acc and user npy files",action="store_true" )
+parser.add_argument("--hidepass", help="place password in paste buffer",action="store_true")
+parser.add_argument("--init", nargs='+', help="initialize with two gpg keys")
+parser.add_argument("--load", help="load acc & user files from ~.trepass/",action="store_true")
+parser.add_argument("--remove", help="remove an account")
+parser.add_argument("--showuser", help="show the username for an account")
+parser.add_argument("--showpass", help="show the password for a user",action="store_true")
 
 args = parser.parse_args()
 
@@ -39,6 +42,11 @@ if (len(sys.argv)) < 2:
 if args.add:
 	if len(args.add)!=3:
 		print('account, username and password are required with --add')
+		sys.exit(1)
+
+if args.add_random:
+	if len(args.add_random)!=2:
+		print('account, and username are required with --add-random')
 		sys.exit(1)
 
 if args.init:
@@ -123,6 +131,26 @@ def inputtoacc(account, username, password):
 	os.remove('acc.npy')
 	os.remove('user.npy')
 
+# function to add username and password for an account
+def randomtoacc(account, username):
+	characters = string.ascii_letters + string.punctuation  + string.digits
+	password =  "".join(choice(characters) for x in range(randint(8, 16)))
+	print(password)
+	accuser=(id(account, username))
+	acc.update({accuser:username})
+	np.save('acc.npy', acc)
+	with open('acc.npy', 'rb') as input_file:
+		with open('acc.npy.gpg', 'wb') as output_file:
+			c.encrypt([recipient], 0, input_file, output_file)	
+	print(accuser)
+	user.update({accuser:password})
+	np.save('user.npy', user)
+	with open('user.npy', 'rb') as input_file:
+		with open('user.npy.gpg', 'wb') as output_file:
+			c.encrypt([recipient2], 0, input_file, output_file)
+	os.remove('acc.npy')
+	os.remove('user.npy')
+
 # function to create account:id
 def id(account, username):
 	a=0
@@ -156,6 +184,12 @@ if args.add:
 	password=str(args.add[2])
 	inputtoacc(account,username,password)
 
+# if --add_random option on command line
+if args.add_random:
+	account=str(args.add_random[0])
+	username=str(args.add_random[1])
+	randomtoacc(account,username)
+
 # if --delete option on command line      
 if args.remove:
 	account=str(args.remove)
@@ -179,13 +213,11 @@ if args.showuser:
 
 # if --showpass option on command line
 if args.showpass:
-	username=str(args.showpass)
 	if account in acc:
 		print(user[account])
 
 # if --hidepass option on command line
 if args.hidepass:
-	username=str(args.hidepass)
 	if account in acc:
 		pyperclip.copy(user[account])
 
