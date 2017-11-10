@@ -25,7 +25,7 @@ optional arguments:
   --showuser SHOWUSER   show the username for an account
   --showpass            show the password for a user
 
-To initialize 2 gpg keys need to be provided. They can be created via gpg2 --full-gen-key
+To initialize 2 gpg keys need to be provided. They can be created via gpg2 --full-generate-key
 
 trespass --init key1 key2
 
