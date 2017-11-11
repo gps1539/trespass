@@ -3,3 +3,4 @@ README.txt
 setup.cfg
 setup.py
 trespass/trespass
+trespass/trespass.py
