@@ -8,7 +8,7 @@ setup(
 	'pyperclip',
 	'argparse',
   ],
-  version = '0.6.5.7',
+  version = '0.6.5.8',
   description = 'A secure password keeper', 
   author = 'Graham Smith',
   author_email = 'gps1539@gmail.com',
