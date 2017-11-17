@@ -11,7 +11,7 @@ import pyperclip
 import string
 from random import *
 
-version = "0.7.1"
+version = "0.7.2"
 
 # initialize gpg
 c = gpgme.Context()
@@ -32,7 +32,7 @@ parser.add_argument("--export",  help="export unencrypted acc and user npy files
 parser.add_argument("--hidepass", help="place password in paste buffer",action="store_true")
 parser.add_argument("--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
 parser.add_argument("--load", help="load acc & user files from ~.trepass/",action="store_true")
-parser.add_argument("--remove", help="remove an account")
+parser.add_argument("--remove", nargs='+', help="remove an account")
 parser.add_argument("--showuser", help="show the username for an account")
 parser.add_argument("--showpass", help="show the password for a user",action="store_true")
 parser.add_argument("--version", help="print the version and exit",action="store_true")
@@ -187,6 +187,7 @@ def removeacc(account):
 # if --add option on command line
 if args.add:
 	account=str(args.add[0])
+	print(account)
 	username=str(args.add[1])
 	password=str(args.add[2])
 	inputtoacc(account,username,password)
@@ -199,7 +200,8 @@ if args.add_random:
 
 # if --delete option on command line      
 if args.remove:
-	account=str(args.remove)
+	account=str(args.remove[0])
+	print(account)
 	removeacc(account)
 	sys.exit(1)
 
