@@ -201,7 +201,6 @@ if args.add_random:
 # if --delete option on command line      
 if args.remove:
 	account=str(args.remove[0])
-	print(account)
 	removeacc(account)
 	sys.exit(1)
 
