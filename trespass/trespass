@@ -11,7 +11,7 @@ import pyperclip
 import string
 from random import *
 
-version = "0.7.2"
+version = "0.7.3"
 
 # initialize gpg
 c = gpgme.Context()
@@ -24,18 +24,18 @@ os.chdir(os.path.expanduser('.trespass'))
 
 # command line options and help
 parser = argparse.ArgumentParser()
-parser.add_argument("--accounts", help="list all accounts",action="store_true")
+parser.add_argument("-a","--accounts", help="list all accounts",action="store_true")
 parser.add_argument("--add", nargs='+', help="add an account, username and password")
-parser.add_argument("--add_random", nargs='+', help="add an account username with random password")
+parser.add_argument("--add_random", nargs='+', help="add an account and username and create a random password")
 parser.add_argument("--debug", help="show debug info",action="store_true")
-parser.add_argument("--export",  help="export unencrypted acc and user npy files",action="store_true" )
-parser.add_argument("--hidepass", help="place password in paste buffer",action="store_true")
-parser.add_argument("--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
-parser.add_argument("--load", help="load acc & user files from ~.trepass/",action="store_true")
-parser.add_argument("--remove", nargs='+', help="remove an account")
-parser.add_argument("--showuser", help="show the username for an account")
-parser.add_argument("--showpass", help="show the password for a user",action="store_true")
-parser.add_argument("--version", help="print the version and exit",action="store_true")
+parser.add_argument("-e","--export",  help="export unencrypted acc and user npy files",action="store_true" )
+parser.add_argument("-H","--hidepass", help="place password in paste buffer",action="store_true")
+parser.add_argument("-i","--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
+parser.add_argument("-l","--load", help="load account & user files from ~.trepass/",action="store_true")
+parser.add_argument("-r","--remove", nargs='+', help="remove an account")
+parser.add_argument("-u","--showuser", help="show the username for an account")
+parser.add_argument("-p","--showpass", help="show the password for a user",action="store_true")
+parser.add_argument("-v","--version", help="print the version and exit",action="store_true")
 
 args = parser.parse_args()
 
@@ -201,6 +201,7 @@ if args.add_random:
 # if --delete option on command line      
 if args.remove:
 	account=str(args.remove[0])
+	print(account)
 	removeacc(account)
 	sys.exit(1)
 
