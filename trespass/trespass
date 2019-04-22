@@ -76,13 +76,13 @@ if args.version:
 if os.path.exists('key1.npy')==False:
 	print('Please initialize with --init <gpg-key UUID>')
 else:
-	keys1 = np.load('key1.npy').item()
+	keys1 = np.load('key1.npy', allow_pickle=True).item()
 	recipient= c.get_key(str(keys1[1]))
 
 if os.path.exists('key2.npy')==False:
 	print('Please initialize with --init <gpg-key UUID>')
 else:
-	keys2 = np.load('key2.npy').item()
+	keys2 = np.load('key2.npy', allow_pickle=True).item()
 	recipient2= c.get_key(str(keys2[1]))
 
 # call --load option on command line
@@ -109,7 +109,7 @@ else:
 	with open('acc.npy.gpg', 'rb') as input_file:
 		with open('acc.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-	acc=np.load('acc.npy').item()
+	acc=np.load('acc.npy', allow_pickle=True).item()
 	os.remove('acc.npy')
 if os.path.exists('user.npy.gpg')==False:
 	user={}
@@ -118,7 +118,7 @@ else:
 	with open('user.npy.gpg', 'rb') as input_file:
 		with open('user.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-	user=np.load('user.npy').item()
+	user=np.load('user.npy', allow_pickle=True).item()
 	os.remove('user.npy')
 
 # function to add username and password for an account
@@ -235,11 +235,11 @@ if args.export:
 	with open('acc.npy.gpg', 'rb') as input_file:
 		with open('acc.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-	acc=np.load('acc.npy').item()
+	acc=np.load('acc.npy', allow_pickle=True).item()
 	with open('user.npy.gpg', 'rb') as input_file:
 		with open('user.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
-	acc=np.load('user.npy').item()
+	acc=np.load('user.npy', allow_pickle=True).item()
 	print('exported')
 
 # if --dedug option on command line
