@@ -11,7 +11,7 @@ import pyperclip
 import string
 from random import *
 
-version = "0.7.4"
+version = "0.7.5"
 
 # initialize gpg
 c = gpgme.Context()
@@ -31,7 +31,7 @@ parser.add_argument("--debug", help="show debug info",action="store_true")
 parser.add_argument("-e","--export",  help="export unencrypted acc and user npy files",action="store_true" )
 parser.add_argument("-H","--hidepass", help="place password in paste buffer",action="store_true")
 parser.add_argument("-i","--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
-parser.add_argument("-l","--load", help="load account & user files from ~.trepass/",action="store_true")
+parser.add_argument("-l","--load", help="load account & user files from ~/.trespass/",action="store_true")
 parser.add_argument("-r","--remove", nargs='+', help="remove an account")
 parser.add_argument("-u","--showuser", help="show the username for an account")
 parser.add_argument("-p","--showpass", help="show the password for a user",action="store_true")
