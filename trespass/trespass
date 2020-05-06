@@ -11,7 +11,7 @@ import pyperclip
 import string
 from random import *
 
-version = "0.7.5"
+version = "0.7.6"
 
 # initialize gpg
 c = gpgme.Context()
@@ -26,9 +26,9 @@ os.chdir(os.path.expanduser('.trespass'))
 parser = argparse.ArgumentParser()
 parser.add_argument("-a","--accounts", help="list all accounts",action="store_true")
 parser.add_argument("--add", nargs='+', help="add an account, username and password")
-parser.add_argument("--add_random", nargs='+', help="add an account and username and create a random password")
+parser.add_argument("--add_random", nargs='+', help="add an account, username and create a random password")
 parser.add_argument("--debug", help="show debug info",action="store_true")
-parser.add_argument("-e","--export",  help="export unencrypted acc and user npy files",action="store_true" )
+parser.add_argument("-e","--export",  help="export unencrypted acc and user files",action="store_true" )
 parser.add_argument("-H","--hidepass", help="place password in paste buffer",action="store_true")
 parser.add_argument("-i","--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
 parser.add_argument("-l","--load", help="load account & user files from ~/.trespass/",action="store_true")
@@ -240,7 +240,7 @@ if args.export:
 		with open('user.npy', 'wb') as output_file:
 			c.decrypt(input_file, output_file)
 	acc=np.load('user.npy', allow_pickle=True).item()
-	print('exported')
+	print('exported to',os.getcwd())
 
 # if --dedug option on command line
 if args.debug:
