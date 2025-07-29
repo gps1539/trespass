@@ -2,249 +2,396 @@
 import sys
 import os
 import re
-import getopt
-import gpgme
-import io
+import getopt # Not used in original, can remove if not needed elsewhere
+import io # Not explicitly used for file ops in rewritten parts
 import numpy as np
 import argparse
 import pyperclip
 import string
 from random import *
+import subprocess
 
-version = "0.7.6"
-
-# initialize gpg
-c = gpgme.Context()
+version = "0.8.0"
 
 # set directory to user's home (should work for Linux, Mac and Windows)
 os.chdir(os.path.expanduser("~"))
-if os.path.exists('.trespass')==False:
-	os.mkdir('.trespass')
-os.chdir(os.path.expanduser('.trespass'))
+if not os.path.exists('.trespass'):
+    os.mkdir('.trespass')
+os.chdir(os.path.join(os.path.expanduser('~'), '.trespass'))
 
 # command line options and help
-parser = argparse.ArgumentParser()
-parser.add_argument("-a","--accounts", help="list all accounts",action="store_true")
-parser.add_argument("--add", nargs='+', help="add an account, username and password")
-parser.add_argument("--add_random", nargs='+', help="add an account, username and create a random password")
-parser.add_argument("--debug", help="show debug info",action="store_true")
-parser.add_argument("-e","--export",  help="export unencrypted acc and user files",action="store_true" )
-parser.add_argument("-H","--hidepass", help="place password in paste buffer",action="store_true")
-parser.add_argument("-i","--init", nargs='+', help="initialize with two gpg keys. (keys can be created with gpg2 --gen-key)")
-parser.add_argument("-l","--load", help="load account & user files from ~/.trespass/",action="store_true")
-parser.add_argument("-r","--remove", nargs='+', help="remove an account")
-parser.add_argument("-u","--showuser", help="show the username for an account")
-parser.add_argument("-p","--showpass", help="show the password for a user",action="store_true")
-parser.add_argument("-v","--version", help="print the version and exit",action="store_true")
+parser = argparse.ArgumentParser(
+    description="A simple password manager using GnuPG."
+)
+parser.add_argument("-a", "--accounts", help="list all accounts", action="store_true")
+parser.add_argument("--add", nargs=3, help="add an account, username and password (e.g., --add mybank myuser mypass)")
+parser.add_argument("--add_random", nargs=2, help="add an account, username and create a random password (e.g., --add_random mybank myuser)")
+parser.add_argument("--debug", help="show debug info", action="store_true")
+parser.add_argument("-e", "--export", help="export unencrypted acc and user files", action="store_true")
+parser.add_argument("-H", "--hidepass", help="place password in paste buffer", action="store_true")
+parser.add_argument("-i", "--init", nargs=2, help="initialize with two GPG key IDs (keys can be created with gpg --full-generate-key)")
+parser.add_argument("-l", "--load", help="load account & user files from ~/.trespass/", action="store_true")
+parser.add_argument("-r", "--remove", nargs=1, help="remove an account (e.g., --remove mybank:12345)")
+parser.add_argument("-u", "--showuser", help="show the username for an account (e.g., --showuser mybank:12345)")
+parser.add_argument("-p", "--showpass", help="show the password for a user", action="store_true")
+parser.add_argument("-v", "--version", help="print the version and exit", action="store_true")
 
 args = parser.parse_args()
 
-if (len(sys.argv)) < 2:
-	parser.print_usage()
+# Initial argument checks
+if len(sys.argv) < 2:
+    parser.print_usage()
+    sys.exit(0) # Exit cleanly if no arguments
 
-if args.add:
-	if len(args.add)!=3:
-		print('account, username and password are required with --add')
-		sys.exit(1)
+if args.add and len(args.add) != 3:
+    print('Error: --add requires an account, username, and password.')
+    sys.exit(1)
 
-if args.add_random:
-	if len(args.add_random)!=2:
-		print('account, and username are required with --add-random')
-		sys.exit(1)
+if args.add_random and len(args.add_random) != 2:
+    print('Error: --add_random requires an account and a username.')
+    sys.exit(1)
 
-if args.init:
-	if len(args.init)!=2:
-		print('please provide two gpg keys with --init')
-		sys.exit(1)
-
-if args.init:
-	k1=str(args.init[0])
-	key1={1:k1}
-	np.save('key1.npy', key1)
-	print(key1[1])
-	k2=str(args.init[1])
-	key2={1:k2}
-	np.save('key2.npy', key2)
-	print(key2[1])
-	sys.exit(1)
+if args.init and len(args.init) != 2:
+    print('Error: --init requires two GPG key IDs.')
+    sys.exit(1)
 
 if args.version:
-	print('version ' + version)
-	sys.exit(1)
+    print(f'version {version}')
+    sys.exit(0)
 
-# check if gpg keys exist
-if os.path.exists('key1.npy')==False:
-	print('Please initialize with --init <gpg-key UUID>')
+if args.init:
+    k1 = str(args.init[0])
+    key1 = {1: k1}
+    np.save('key1.npy', key1)
+    print(f"Key 1 saved: {key1[1]}")
+    k2 = str(args.init[1])
+    key2 = {1: k2}
+    np.save('key2.npy', key2)
+    print(f"Key 2 saved: {key2[1]}")
+    sys.exit(0)
+
+# --- GPG Helper Functions ---
+def gpg_encrypt(data_bytes, recipient_key_id, always_trust=True):
+    """Encrypts bytes using GPG."""
+    command = ["gpg", "--batch", "--encrypt", "--armor", "--output", "-", "--recipient", recipient_key_id]
+    if always_trust:
+        command.extend(["--trust-model", "always"])
+    
+    try:
+        process = subprocess.run(
+            command,
+            input=data_bytes,
+            capture_output=True,
+            check=True,
+            text=False # Input and output are bytes
+        )
+        return process.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"Error encrypting data: GPG exited with code {e.returncode}")
+        print(f"STDOUT: {e.stdout.decode('utf-8')}")
+        print(f"STDERR: {e.stderr.decode('utf-8')}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print("Error: 'gpg' command not found. Please ensure GnuPG is installed and in your PATH.")
+        sys.exit(1)
+
+def gpg_decrypt(data_bytes):
+    """Decrypts bytes using GPG."""
+    command = ["gpg", "--batch", "--decrypt", "--output", "-", "--armor"]
+    
+    try:
+        process = subprocess.run(
+            command,
+            input=data_bytes,
+            capture_output=True,
+            check=True,
+            text=False # Input and output are bytes
+        )
+        return process.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"Error decrypting data: GPG exited with code {e.returncode}")
+        print(f"STDOUT: {e.stdout.decode('utf-8')}")
+        print(f"STDERR: {e.stderr.decode('utf-8')}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print("Error: 'gpg' command not found. Please ensure GnuPG is installed and in your PATH.")
+        sys.exit(1)
+
+# Check if GPG keys exist
+recipient_key_id_1 = None
+recipient_key_id_2 = None
+
+if not os.path.exists('key1.npy') or not os.path.exists('key2.npy'):
+    print('Please initialize with --init <gpg-key UUID1> <gpg-key UUID2>')
+    sys.exit(1)
 else:
-	keys1 = np.load('key1.npy', allow_pickle=True).item()
-	recipient= c.get_key(str(keys1[1]))
+    keys1_data = np.load('key1.npy', allow_pickle=True).item()
+    recipient_key_id_1 = str(keys1_data[1])
 
-if os.path.exists('key2.npy')==False:
-	print('Please initialize with --init <gpg-key UUID>')
+    keys2_data = np.load('key2.npy', allow_pickle=True).item()
+    recipient_key_id_2 = str(keys2_data[1])
+
+# Load/Decrypt existing data or initialize empty dictionaries
+acc = {}
+user = {}
+
+# Handle acc.npy.gpg
+if os.path.exists('acc.npy.gpg'):
+    with open('acc.npy.gpg', 'rb') as f:
+        encrypted_data = f.read()
+    try:
+        decrypted_data = gpg_decrypt(encrypted_data)
+        acc = np.load(io.BytesIO(decrypted_data), allow_pickle=True).item()
+    except Exception as e:
+        print(f"Warning: Could not decrypt or load 'acc.npy.gpg'. It might be corrupt or encrypted with a different key. Error: {e}")
+        acc = {} # Initialize empty if decryption fails
 else:
-	keys2 = np.load('key2.npy', allow_pickle=True).item()
-	recipient2= c.get_key(str(keys2[1]))
+    # If .gpg file doesn't exist, start with an empty dictionary
+    pass # acc already initialized as {}
 
-# call --load option on command line
+# Handle user.npy.gpg
+if os.path.exists('user.npy.gpg'):
+    with open('user.npy.gpg', 'rb') as f:
+        encrypted_data = f.read()
+    try:
+        decrypted_data = gpg_decrypt(encrypted_data)
+        user = np.load(io.BytesIO(decrypted_data), allow_pickle=True).item()
+    except Exception as e:
+        print(f"Warning: Could not decrypt or load 'user.npy.gpg'. It might be corrupt or encrypted with a different key. Error: {e}")
+        user = {} # Initialize empty if decryption fails
+else:
+    # If .gpg file doesn't exist, start with an empty dictionary
+    pass # user already initialized as {}
+
+
+# Call --load option on command line
 if args.load:
-	if os.path.exists('acc.npy')==False:
-		print("Please copy acc.npy to .trespass in your home directory")
-		sys.exit(1)
-	else:
-		with open('acc.npy', 'rb') as input_file:
-			with open('acc.npy.gpg', 'wb') as output_file:
-				c.encrypt([recipient], 0, input_file, output_file)
-	if os.path.exists('user.npy')==False:
-		print("Please copy user.npy to .trespass in your home directory")
-		sys.exit(1)
-	else:
-		with open('user.npy', 'rb') as input_file:
-			with open('user.npy.gpg', 'wb') as output_file:
-				c.encrypt([recipient2], 0, input_file, output_file)
+    if not os.path.exists('acc.npy'):
+        print("Please copy acc.npy to .trespass in your home directory for loading.")
+        sys.exit(1)
+    else:
+        with open('acc.npy', 'rb') as input_file:
+            plaintext_data = input_file.read()
+        encrypted_data = gpg_encrypt(plaintext_data, recipient_key_id_1)
+        with open('acc.npy.gpg', 'wb') as output_file:
+            output_file.write(encrypted_data)
+        print("acc.npy encrypted to acc.npy.gpg")
 
-if os.path.exists('acc.npy.gpg')==False:
-	acc={}
-	np.save('acc.npy', acc)
-else:
-	with open('acc.npy.gpg', 'rb') as input_file:
-		with open('acc.npy', 'wb') as output_file:
-			c.decrypt(input_file, output_file)
-	acc=np.load('acc.npy', allow_pickle=True).item()
-	os.remove('acc.npy')
-if os.path.exists('user.npy.gpg')==False:
-	user={}
-	np.save('user.npy', acc)
-else:
-	with open('user.npy.gpg', 'rb') as input_file:
-		with open('user.npy', 'wb') as output_file:
-			c.decrypt(input_file, output_file)
-	user=np.load('user.npy', allow_pickle=True).item()
-	os.remove('user.npy')
+    if not os.path.exists('user.npy'):
+        print("Please copy user.npy to .trespass in your home directory for loading.")
+        sys.exit(1)
+    else:
+        with open('user.npy', 'rb') as input_file:
+            plaintext_data = input_file.read()
+        encrypted_data = gpg_encrypt(plaintext_data, recipient_key_id_2)
+        with open('user.npy.gpg', 'wb') as output_file:
+            output_file.write(encrypted_data)
+        print("user.npy encrypted to user.npy.gpg")
+    
+    # After loading and encrypting, remove the unencrypted files
+    if os.path.exists('acc.npy'):
+        os.remove('acc.npy')
+    if os.path.exists('user.npy'):
+        os.remove('user.npy')
+    sys.exit(0)
 
-# function to add username and password for an account
+
+# Function to add username and password for an account
 def inputtoacc(account, username, password):
-	accuser=(id(account, username))
-	acc.update({accuser:username})
-	np.save('acc.npy', acc)
-	with open('acc.npy', 'rb') as input_file:
-		with open('acc.npy.gpg', 'wb') as output_file:
-			c.encrypt([recipient], 0, input_file, output_file)	
-	print(accuser)
-	user.update({accuser:password})
-	np.save('user.npy', user)
-	with open('user.npy', 'rb') as input_file:
-		with open('user.npy.gpg', 'wb') as output_file:
-			c.encrypt([recipient2], 0, input_file, output_file)
-	os.remove('acc.npy')
-	os.remove('user.npy')
+    accuser = id(account, username)
+    
+    acc[accuser] = username
+    # Save to a BytesIO object first, then encrypt
+    acc_bytes_io = io.BytesIO()
+    np.save(acc_bytes_io, acc)
+    acc_encrypted_data = gpg_encrypt(acc_bytes_io.getvalue(), recipient_key_id_1)
+    with open('acc.npy.gpg', 'wb') as output_file:
+        output_file.write(acc_encrypted_data)
+    
+    print(accuser)
+    
+    user[accuser] = password
+    # Save to a BytesIO object first, then encrypt
+    user_bytes_io = io.BytesIO()
+    np.save(user_bytes_io, user)
+    user_encrypted_data = gpg_encrypt(user_bytes_io.getvalue(), recipient_key_id_2)
+    with open('user.npy.gpg', 'wb') as output_file:
+        output_file.write(user_encrypted_data)
 
-# function to add username and password for an account
+# Function to add username and create a random password for an account
 def randomtoacc(account, username):
-	characters = string.ascii_letters + string.punctuation  + string.digits
-	password =  "".join(choice(characters) for x in range(randint(8, 16)))
-	print(password)
-	accuser=(id(account, username))
-	acc.update({accuser:username})
-	np.save('acc.npy', acc)
-	with open('acc.npy', 'rb') as input_file:
-		with open('acc.npy.gpg', 'wb') as output_file:
-			c.encrypt([recipient], 0, input_file, output_file)	
-	print(accuser)
-	user.update({accuser:password})
-	np.save('user.npy', user)
-	with open('user.npy', 'rb') as input_file:
-		with open('user.npy.gpg', 'wb') as output_file:
-			c.encrypt([recipient2], 0, input_file, output_file)
-	os.remove('acc.npy')
-	os.remove('user.npy')
+    characters = string.ascii_letters + string.punctuation + string.digits
+    password = "".join(choice(characters) for x in range(randint(8, 16)))
+    print(f"Generated password: {password}")
+    
+    accuser = id(account, username)
+    
+    acc[accuser] = username
+    acc_bytes_io = io.BytesIO()
+    np.save(acc_bytes_io, acc)
+    acc_encrypted_data = gpg_encrypt(acc_bytes_io.getvalue(), recipient_key_id_1)
+    with open('acc.npy.gpg', 'wb') as output_file:
+        output_file.write(acc_encrypted_data)
+    
+    print(accuser)
+    
+    user[accuser] = password
+    user_bytes_io = io.BytesIO()
+    np.save(user_bytes_io, user)
+    user_encrypted_data = gpg_encrypt(user_bytes_io.getvalue(), recipient_key_id_2)
+    with open('user.npy.gpg', 'wb') as output_file:
+        output_file.write(user_encrypted_data)
 
-# function to create account:id
+# Function to create account:id
 def id(account, username):
-	a=0
-	for c in account+username:
-		a+=(ord(c))	
-	accuser=((account) + ":" + str(a))
-	return (accuser)
+    a = 0
+    for c in account + username:
+        a += (ord(c))    
+    accuser = f"{account}:{a}"
+    return accuser
 
-# function to remove an account     
-def removeacc(account):
-	if account in acc:
-		del acc[account]
-		np.save('acc.npy', acc)
-		with open('acc.npy', 'rb') as input_file:
-			with open('acc.npy.gpg', 'wb') as output_file:
-				c.encrypt([recipient], 0, input_file, output_file)
-		os.remove('acc.npy')				
-	if account in user:
-		del user[account]
-		np.save('user.npy', user)
-		with open('user.npy', 'rb') as input_file:
-			with open('user.npy.gpg', 'wb') as output_file:
-				c.encrypt([recipient2], 0, input_file, output_file)
-		os.remove('user.npy')
-	return
+# Function to remove an account
+def removeacc(account_id):
+    if account_id in acc:
+        del acc[account_id]
+        # Save updated acc
+        acc_bytes_io = io.BytesIO()
+        np.save(acc_bytes_io, acc)
+        acc_encrypted_data = gpg_encrypt(acc_bytes_io.getvalue(), recipient_key_id_1)
+        with open('acc.npy.gpg', 'wb') as output_file:
+            output_file.write(acc_encrypted_data)
+        print(f"Account '{account_id}' removed from accounts list.")
+    else:
+        print(f"Account '{account_id}' not found in accounts list.")
+        
+    if account_id in user:
+        del user[account_id]
+        # Save updated user
+        user_bytes_io = io.BytesIO()
+        np.save(user_bytes_io, user)
+        user_encrypted_data = gpg_encrypt(user_bytes_io.getvalue(), recipient_key_id_2)
+        with open('user.npy.gpg', 'wb') as output_file:
+            output_file.write(user_encrypted_data)
+        print(f"Password for '{account_id}' removed from user data.")
+    else:
+        print(f"Password for '{account_id}' not found in user data.")
 
 # if --add option on command line
 if args.add:
-	account=str(args.add[0])
-	print(account)
-	username=str(args.add[1])
-	password=str(args.add[2])
-	inputtoacc(account,username,password)
+    account = args.add[0]
+    username = args.add[1]
+    password = args.add[2]
+    inputtoacc(account, username, password)
+    sys.exit(0)
 
 # if --add_random option on command line
 if args.add_random:
-	account=str(args.add_random[0])
-	username=str(args.add_random[1])
-	randomtoacc(account,username)
+    account = args.add_random[0]
+    username = args.add_random[1]
+    randomtoacc(account, username)
+    sys.exit(0)
 
-# if --delete option on command line      
+# if --remove option on command line
 if args.remove:
-	account=str(args.remove[0])
-	print(account)
-	removeacc(account)
-	sys.exit(1)
+    account_id_to_remove = args.remove[0]
+    removeacc(account_id_to_remove)
+    sys.exit(0)
 
-# if --accounts option on command line      
+# if --accounts option on command line
 if args.accounts:
-	for key in sorted(acc.keys()):
-		print(key)
-	sys.exit(1)
+    if not acc:
+        print("No accounts found.")
+    else:
+        print("Accounts:")
+        for key in sorted(acc.keys()):
+            print(f"- {key}")
+    sys.exit(0)
 
-# if --showuser option on command line      
+account_to_show = None
+
 if args.showuser:
-	account=str(args.showuser)
-	if account in acc:	
-		print(acc[account])
-	else:
-		print('Error no account "' + (account) + '"')	
-		sys.exit(1)
+    account_to_show = str(args.showuser)
+elif args.showpass or args.hidepass:
 
-# if --showpass option on command line
-if args.showpass:
-	if account in acc:
-		print(user[account])
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith('-'): # Skip flags
+            continue
+        # Heuristic: if it looks like an account:id string, use it.
+        if re.match(r'.+:\d+$', arg) and i > 0 and not sys.argv[i-1].startswith(('--add', '--add_random', '--init', '--remove', '--showuser')):
+             account_to_show = arg
+             break
+    if not account_to_show:
+        print("Error: An account ID is required for --showuser, --showpass, or --hidepass.")
+        parser.print_usage()
+        sys.exit(1)
 
-# if --hidepass option on command line
-if args.hidepass:
-	if account in acc:
-		pyperclip.copy(user[account])
+
+if account_to_show:
+    if account_to_show not in acc:
+        print(f'Error: No account "{account_to_show}" found.')
+        sys.exit(1)
+
+    if args.showuser:
+        print(acc[account_to_show])
+
+    if args.showpass:
+        if account_to_show in user:
+            print(user[account_to_show])
+        else:
+            print(f"Error: No password found for account '{account_to_show}'.")
+    
+    if args.hidepass:
+        if account_to_show in user:
+            pyperclip.copy(user[account_to_show])
+            print(f"Password for '{account_to_show}' copied to clipboard.")
+        else:
+            print(f"Error: No password found for account '{account_to_show}'.")
+    
+    # Exit after displaying info, unless debug is on
+    if not args.debug:
+        sys.exit(0)
+
 
 # if --export option on command line
 if args.export:
-	with open('acc.npy.gpg', 'rb') as input_file:
-		with open('acc.npy', 'wb') as output_file:
-			c.decrypt(input_file, output_file)
-	acc=np.load('acc.npy', allow_pickle=True).item()
-	with open('user.npy.gpg', 'rb') as input_file:
-		with open('user.npy', 'wb') as output_file:
-			c.decrypt(input_file, output_file)
-	acc=np.load('user.npy', allow_pickle=True).item()
-	print('exported to',os.getcwd())
+    # Decrypt and save acc.npy
+    if os.path.exists('acc.npy.gpg'):
+        with open('acc.npy.gpg', 'rb') as input_file:
+            encrypted_data = input_file.read()
+        decrypted_data = gpg_decrypt(encrypted_data)
+        with open('acc.npy', 'wb') as output_file:
+            output_file.write(decrypted_data)
+    else:
+        print("acc.npy.gpg not found for export.")
 
-# if --dedug option on command line
+    # Decrypt and save user.npy
+    if os.path.exists('user.npy.gpg'):
+        with open('user.npy.gpg', 'rb') as input_file:
+            encrypted_data = input_file.read()
+        decrypted_data = gpg_decrypt(encrypted_data)
+        with open('user.npy', 'wb') as output_file:
+            output_file.write(decrypted_data)
+    else:
+        print("user.npy.gpg not found for export.")
+    
+    print(f'Unencrypted files exported to {os.getcwd()}')
+    sys.exit(0)
+
+# if --debug option on command line
 if args.debug:
-	print(recipient)
-	print(recipient2)
-	print(acc)
-	print(user)
+    print("\n--- DEBUG INFO ---")
+    print(f"Recipient Key 1 ID: {recipient_key_id_1}")
+    print(f"Recipient Key 2 ID: {recipient_key_id_2}")
+    print("Loaded Accounts (acc):")
+    if acc:
+        for k, v in acc.items():
+            print(f"  {k}: {v}")
+    else:
+        print("  (empty)")
+    print("Loaded Users/Passwords (user):")
+    if user:
+        for k, v in user.items():
+            print(f"  {k}: {'*' * len(v) if not args.showpass else v}") 
+    else:
+        print("  (empty)")
+    print("--- END DEBUG ---")
